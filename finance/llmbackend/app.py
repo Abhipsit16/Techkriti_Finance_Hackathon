@@ -78,9 +78,9 @@ llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", api_key=api_key)
 # Paths
 current_directory = "C:/Users/abhip/Desktop/Techy/Techkriti_Finance_Hackathon/finance/public/plots"
 csv_path = os.path.join(os.getcwd(), "CashflowsinCR.csv")
-# data=pandas.read_csv(csv_path)
-# data=data.T
-# data.to_csv(csv_path)
+data=pd.read_csv(csv_path)
+data=data.T
+data.to_csv(csv_path)
 # CSV Agent: Handles data analysis and plotting
 csv_agent = create_csv_agent(llm, path=csv_path, verbose=True, allow_dangerous_code=True)
 
