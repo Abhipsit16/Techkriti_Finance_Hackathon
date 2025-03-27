@@ -1,6 +1,8 @@
+// 
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 interface UploadBoxProps {
   title: string;
@@ -23,12 +25,19 @@ export default function UploadBox({ title, endpoint, context }: UploadBoxProps) 
       const formData = new FormData();
       formData.append("file", file);
 
-      await fetch(endpoint, {
-        method: "POST",
-        body: formData,
+      // Sending the file using axios
+      const response = await axios.post("http://127.0.0.1:8000/upload/", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
 
-      router.push(`/ask?context=${context}`);
+      if (response.status === 200) {
+        console.log("File uploaded successfully:", response.data);
+        router.push(`/ask?context=${context}`);
+      } else {
+        alert("File upload failed. Server responded with an error.");
+      }
     } catch (err) {
       console.error("Upload failed:", err);
       alert("Upload failed. Try again.");
@@ -42,7 +51,7 @@ export default function UploadBox({ title, endpoint, context }: UploadBoxProps) 
       <h2 className="text-xl font-semibold">{title}</h2>
       <input
         type="file"
-        accept="application/pdf"
+        accept=".csv"
         onChange={(e) => setFile(e.target.files?.[0] || null)}
         className="border p-2 w-full rounded-lg"
       />
