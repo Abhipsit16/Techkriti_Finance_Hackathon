@@ -6,5 +6,6 @@ pymongo
 matplotlib
 langchain_community
 tabulate
+bs4
 fastapi[standard]
 langchain_google_genai
