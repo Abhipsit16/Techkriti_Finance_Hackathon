@@ -40,7 +40,14 @@ export default function Navbar() {
             Learn
           </Link>
         </li>
-
+        <li>
+          <Link
+            href="/analysis"
+            className="hover:text-blue-600 transition-colors duration-300"
+          >
+            Analysis
+          </Link>
+        </li>
         <li>
           <Link
             href="/register"

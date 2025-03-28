@@ -1,134 +1,65 @@
-from langchain_experimental.agents import create_csv_agent
-from langchain.agents import initialize_agent, Tool
-from langchain_groq import ChatGroq
-from langchain.chains import LLMChain
-from langchain.prompts import ChatPromptTemplate,PromptTemplate
-from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
-from langchain_community.tools import DuckDuckGoSearchRun
+import os
+from dotenv import load_dotenv
+from langchain_experimental.agents import create_csv_agent, create_pandas_dataframe_agent
+from langchain.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
-from pymongo import MongoClient
-from fastapi import FastAPI
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
-import matplotlib.pyplot
 
-# Step 1: Fetch the webpage
-url = "https://www.screener.in/company/TATASTEEL/"  # Replace with your target URL
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-}
-
-response = requests.get(url, headers=headers)
-if response.status_code != 200:
-    raise Exception(f"Failed to fetch page. Status Code: {response.status_code}")
-
-# Step 2: Parse the HTML
+# Web scraping and data processing
+url = "https://www.screener.in/company/TATASTEEL/"
+response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
 soup = BeautifulSoup(response.text, "html.parser")
 
-# Step 3: Locate Financial Tables (Update class names based on inspection)
-tables = soup.find_all("table", class_="data-table")  # Example class name
+# Process tables
+financial_tables = []
+for table in soup.select('table.data-table'):
+    df = pd.read_html(str(table))[0]
+    financial_tables.append(df)
 
-# Step 4: Extract Data from Tables
-dataframes = []
-for table in tables:
-    # Extract table headers
-    headers = []
-    for th in table.find_all("th"):
-        headers.append(th.text.strip())
-    
-    # Extract table rows
-    rows = []
-    for tr in table.find_all("tr")[1:]:  # Skip header row
-        row = [td.text.strip() for td in tr.find_all("td")]
-        if row:
-            rows.append(row)
-    
-    # Convert to DataFrame
-    df = pd.DataFrame(rows, columns=headers)
-    dataframes.append(df)
+combined_df = pd.concat(financial_tables)
 
-# Step 5: Combine DataFrames and Save to CSV
-if dataframes:
-    combined_df = pd.concat(dataframes, ignore_index=True)
-    combined_df.to_csv("screener_financial_data.csv", index=False)
-    print("Data saved to screener_financial_data.csv")
-else:
-    print("No tables found.")
+combined_df=combined_df.drop_duplicates()
+combined_df=combined_df.T
+combined_df = combined_df.set_index('Unnamed: 0').reset_index()
 
 
 
-import os                                   
-from dotenv import load_dotenv
+# Clean and transpose data
+# data = pd.read_csv("screener_financial_data.csv").set_index('Unnamed: 0').T.reset_index()
+# data.columns = data.iloc[0]
+# data = data.drop(0).rename(columns={'index': 'Time'}).fillna(0).reset_index(drop=True)
+# data.to_csv("screener_financial_data.csv", index=False)
 
-# app=FastAPI()
-
-# @app.get("/")
-# async def root():
-#     return {"message": "Hello World"}
-
+# Initialize agents
 load_dotenv()
-api_key=os.getenv('GEMINI_KEY')
-# buf=io.BytesIO()
-# Initialize LLM
-# llm=ChatGroq(model="llama-3.3-70b-versatile", api_key=api_key)
+llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", api_key=os.getenv('GEMINI_KEY'))
+csv_agent = create_pandas_dataframe_agent(llm=llm, verbose=True, allow_dangerous_code=True, df=combined_df)
 
-user_id= "67e381f6394e76480a87c750"
-llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", api_key=api_key)
-# Paths
-current_directory = "C:/Users/abhip/Desktop/Techy/Techkriti_Finance_Hackathon/finance/public/plots"
-csv_path = os.path.join(os.getcwd(), "CashflowsinCR.csv")
-data=pd.read_csv(csv_path)
-data=data.T
-data.to_csv(csv_path)
-# CSV Agent: Handles data analysis and plotting
-csv_agent = create_csv_agent(llm, path=csv_path, verbose=True, allow_dangerous_code=True)
+# Analysis prompt
+analysis_template = """Analyze this financial data:
+- Identify trends in Sales, Expenses, and Profits
+- Ignore all the worthless columns like Raw PDF and duplicate columns
+- If you get anything in non numeric format or null, just remove those columns
+- Calculate YOY growth rates
+- Highlight all the key insights for investors
+- Use simple language avoiding technical terms"""
 
-# Web Search Tool
-# search = DuckDuckGoSearchRun(api_wrapper=DuckDuckGoSearchAPIWrapper())
+analysis_result = csv_agent.invoke(analysis_template)
 
-# Analysis Prompt
-analysis_prompt = PromptTemplate.from_template("""
-    Perform a thorough analysis of the financial statement:
+# Plotting prompt
+plot_template = """Generate Python code to:
+1. Import matplotlib and os
+2. Create line plots for key metrics over time
+3. Save plots to {current_directory}
+4. Return file paths list
 
-    {x}
-    - Identify key trends and patterns.
-    - Calculate important metrics (e.g., growth rate, profitability).
-    - Highlight correlations between financial indicators.
-    - Simplify insights for a common person.
-    - Recommend actions based on the data.
-    Generate a comprehensive yet simple report.
-    """)
+Example:
+plt.plot(data['Time'], data['Sales'])
+plt.savefig(os.path.join({current_directory}, 'sales_trend.png'))"""
 
-# Graph Plotting Prompt
-graph_prompt = ChatPromptTemplate.from_messages([
-    ("human", """
-     Handle the null columns in a proper manner by deleting them, and delete the columns that can lead to key error.
-    Plot the graphs you think are necessary while giving me an analysis of this statement.
-    Save it to {current_directory} with a suitable filename in png format and return the array of filepaths.
-    Do not standardize the data or overanalyze, just plot and return quickly.
-    """),
-], template_format="f-string")
+plot_result = csv_agent.invoke(plot_template.format(current_directory="C:/Users/abhip/Desktop/Techy/Techkriti_Finance_Hackathon/finance/public/plots"))
 
-# Agents
-analysis_agent = analysis_prompt| csv_agent
-graph_agent = graph_prompt | csv_agent
-
-analysis=analysis_agent.invoke({"x":""})
-content=analysis["output"]
-print(content)
-
-plot_result = graph_agent.invoke(input={"current_directory": current_directory})
-print(plot_result)
-client = MongoClient("mongodb://localhost:27017/")
-db = client["techkriti"]
-collection = db["analysis"]
-
-analysis_doc = {
-    "user_id":user_id,
-    "content": content,
-    "image_data": plot_result["output"]
-}
-inserted_id = collection.insert_one(analysis_doc).inserted_id
-
-print("Plot Saved As:\n", plot_result)
+print("Analysis:", analysis_result['output'])
+print("Plots saved at:", plot_result['output'])

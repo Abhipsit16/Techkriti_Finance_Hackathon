@@ -1,28 +1,25 @@
-import UploadBox from "@/components/UploadBox";
+"use client";
+import { useState, ChangeEvent } from "react";
 
 export default function UploadPage() {
+  const [companyName, setCompanyName] = useState<string>("");
+
+  const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setCompanyName(event.target.value);
+  };
+
   return (
-    <div className="w-screen min-h-screen bg-gradient-to-tr from-blue-100 via-white to-blue-50 flex flex-col items-center justify-center px-4 py-12">
-      <h1 className="text-4xl md:text-6xl font-extrabold mb-6 bg-gradient-to-r from-blue-700 via-purple-600 to-pink-500 text-transparent bg-clip-text">
-        Upload Financial Statements
+    <div className="w-screen min-h-screen bg-gradient-to-tr from-blue-100 via-white to-blue-50 flex flex-col items-center justify-center px-6 py-12">
+      <h1 className="text-4xl md:text-5xl font-extrabold mb-8 bg-gradient-to-r from-blue-700 via-purple-600 to-pink-500 text-transparent bg-clip-text text-center">
+        Enter the Company Name
       </h1>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-6xl mt-10">
-        <UploadBox
-          title="Balance Sheet"
-          endpoint="http://localhost:5000/api/upload/balance-sheet"
-          context="balance-sheet"
-        />
-        <UploadBox
-          title="Cash Flow Statement"
-          endpoint="http://localhost:5000/api/upload/cashflow"
-          context="cash-flow"
-        />
-        <UploadBox
-          title="Income Statement"
-          endpoint="http://localhost:5000/api/upload/income-statement"
-          context="income-statement"
-        />
-      </div>
+      <input
+        className="w-full max-w-lg px-4 py-3 text-lg text-gray-900 placeholder-gray-500 bg-white border-2 border-gray-300 rounded-xl shadow-md outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all"
+        type="text"
+        placeholder="Type here..."
+        value={companyName}
+        onChange={handleInputChange}
+      />
     </div>
   );
 }
